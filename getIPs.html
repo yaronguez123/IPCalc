@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>IP Resolver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 24px 28px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .field-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    input[readonly] {
+      background-color: #f9f9f9;
+      color: #333;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .row > div {
+      flex: 1;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+    }
+
+    .error {
+      color: #b00020;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>מחשבון כתובות IP</h1>
+
+    <!-- ID -->
+    <div class="field-group">
+      <label for="deviceId">היכר (100–999)</label>
+      <input
+        id="deviceId"
+        type="text"
+        maxlength="4"
+        inputmode="numeric"
+        placeholder="לדוגמה: 110, 201, 798"
+      />
+      <div id="idError" class="error" style="display:none;">
+        ההיכר חייב להיות מספר בין 100 ל-999.
+      </div>
+    </div>
+
+    <!-- Station -->
+    <div class="field-group">
+      <label for="stationNumber">עמדת מאור</label>
+      <div class="row">
+        <div>
+          <select id="stationNumber">
+            <option value="">בחר עמדה...</option>
+          </select>
+        </div>
+        <div>
+          <input
+            id="stationIp"
+            type="text"
+            placeholder="IP של עמדת מאור"
+            readonly
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Printer -->
+    <div class="field-group">
+      <label for="printerNumber">מדפסת</label>
+      <div class="row">
+        <div>
+          <select id="printerNumber">
+            <option value="">בחר מדפסת...</option>
+          </select>
+        </div>
+        <div>
+          <input
+            id="printerIp"
+            type="text"
+            placeholder="IP של המדפסת"
+            readonly
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- KIOSK -->
+    <div class="field-group">
+      <label for="kioskIp">קיוסק</label>
+      <input
+        id="kioskIp"
+        type="text"
+        placeholder="IP של הקיוסק"
+        readonly
+      />
+    </div>
+
+    <!-- PLASMA -->
+    <div class="field-group">
+      <label for="plasmaIp">פלזמה</label>
+      <input
+        id="plasmaIp"
+        type="text"
+        placeholder="IP של הפלזמה"
+        readonly
+      />
+    </div>
+
+    <div class="note">
+      אחרי הזנת ה<strong>היכר</strong> ימולאו אוטומטית כתובות ה-IP של
+      <strong>קיוסק</strong> ו<strong>פלזמה</strong>.<br />
+      אחרי בחירת מספר <strong>עמדת מאור</strong> / <strong>מדפסת</strong>
+      ימולאו כתובות ה-IP שלהם.
+    </div>
+  </div>
+
+  <script>
+    // Populate Station and Printer dropdowns
+    (function initSelects() {
+      const stationSelect = document.getElementById("stationNumber");
+      const printerSelect = document.getElementById("printerNumber");
+
+      // stations 1–30
+      for (let i = 1; i <= 30; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = i;
+        stationSelect.appendChild(opt);
+      }
+
+      // printers 1–10
+      for (let i = 1; i <= 10; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = i;
+        printerSelect.appendChild(opt);
+      }
+    })();
+
+    const deviceIdInput = document.getElementById("deviceId");
+    const stationNumberSelect = document.getElementById("stationNumber");
+    const printerNumberSelect = document.getElementById("printerNumber");
+
+    const stationIpInput = document.getElementById("stationIp");
+    const printerIpInput = document.getElementById("printerIp");
+    const kioskIpInput = document.getElementById("kioskIp");
+    const plasmaIpInput = document.getElementById("plasmaIp");
+
+    const idError = document.getElementById("idError");
+
+    function parseId() {
+      const raw = deviceIdInput.value.trim();
+      const num = parseInt(raw, 10);
+
+      if (isNaN(num) || num < 100 || num > 999) {
+        idError.style.display = raw ? "block" : "none";
+        return null;
+      }
+
+      idError.style.display = "none";
+      return num;
+    }
+
+    function computeParts(id) {
+      const hundreds = Math.floor(id / 100);   // 1–9
+      const lastTwo = id % 100;                // 0–99
+
+      const stationNet = 110 + hundreds;       // 111–119
+      const kioskNet   = 170 + hundreds;       // 171–179
+
+      return { hundreds, lastTwo, stationNet, kioskNet };
+    }
+
+    function updateKioskAndPlasma() {
+      const id = parseId();
+      if (!id) {
+        kioskIpInput.value = "";
+        plasmaIpInput.value = "";
+        return;
+      }
+
+      const parts = computeParts(id);
+
+      kioskIpInput.value  = `10.${parts.kioskNet}.${parts.lastTwo}.172`;
+      plasmaIpInput.value = `10.${parts.kioskNet}.${parts.lastTwo}.171`;
+    }
+
+    function updateStationIp() {
+      const id = parseId();
+      const stationNum = stationNumberSelect.value;
+
+      if (!id || !stationNum) {
+        stationIpInput.value = "";
+        return;
+      }
+
+      const parts = computeParts(id);
+      stationIpInput.value = `10.${parts.stationNet}.${parts.lastTwo}.${stationNum}`;
+    }
+
+    function updatePrinterIp() {
+      const id = parseId();
+      const printerNum = printerNumberSelect.value;
+
+      if (!id || !printerNum) {
+        printerIpInput.value = "";
+        return;
+      }
+
+      const parts = computeParts(id);
+      const lastOctet = 29 + Number(printerNum); // 30–39
+      printerIpInput.value = `10.${parts.stationNet}.${parts.lastTwo}.${lastOctet}`;
+    }
+
+    function updateAll() {
+      updateKioskAndPlasma();
+      updateStationIp();
+      updatePrinterIp();
+    }
+
+    deviceIdInput.addEventListener("input", updateAll);
+    stationNumberSelect.addEventListener("change", updateStationIp);
+    printerNumberSelect.addEventListener("change", updatePrinterIp);
+  </script>
+</body>
+</html>
